@@ -1,11 +1,770 @@
 <!DOCTYPE html>
-<html lang="en">
-    <head>
-        <meta charset="UTF-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>PakePlus</title>
-    </head>
-    <body>
-        PakePlus
-    </body>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>鬼谷神掌排盘系统 - 导出版</title>
+    <!-- 引入 React 运行环境 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+    <!-- 引入 Babel 用于解析 JSX -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+    <!-- 引入 Tailwind CSS 样式库 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入 Lucide 图标库 -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700;900&display=swap');
+        body { font-family: 'ui-sans-serif', system-ui, -apple-system, sans-serif; }
+        .font-serif { font-family: 'Noto Serif SC', serif; }
+    </style>
+</head>
+<body class="bg-[#F7F8FA]">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useMemo, useEffect } = React;
+
+        // --- 图标组件包装 (由于离线版图标加载方式不同) ---
+        const Icon = ({ name, className }) => {
+            useEffect(() => {
+                if (window.lucide) {
+                    window.lucide.createIcons();
+                }
+            }, [name]);
+            return <i data-lucide={name} className={className}></i>;
+        };
+
+        // --- 常量定义与断语库 ---
+        const EARTHLY_BRANCHES = ['子', '丑', '寅', '卯', '辰', '巳', '午', '未', '申', '酉', '戌', '亥'];
+        const HEAVENLY_STEMS = ['甲', '乙', '丙', '丁', '戊', '己', '庚', '辛', '壬', '癸'];
+        const YONG_SHEN_ORDER = ['命宫', '兄弟', '夫妻', '子女', '财帛', '疾厄', '迁移', '奴仆', '官禄', '田宅', '福德', '父母'];
+
+        // 天干阴阳属性
+        const STEM_YIN_YANG = {
+            '甲': '阳', '乙': '阴', '丙': '阳', '丁': '阴', 
+            '戊': '阳', '己': '阴', '庚': '阳', '辛': '阴', 
+            '壬': '阳', '癸': '阴'
+        };
+
+        // 地支阴阳属性
+        const BRANCH_YIN_YANG = {
+            '子': '阳', '丑': '阴', '寅': '阳', '卯': '阴', 
+            '辰': '阳', '巳': '阴', '午': '阳', '未': '阴', 
+            '申': '阳', '酉': '阴', '戌': '阳', '亥': '阴'
+        };
+
+        // 地支五行属性
+        const BRANCH_ELEMENTS = {
+            '子': '水', '丑': '土', '寅': '木', '卯': '木', 
+            '辰': '土', '巳': '火', '午': '火', '未': '土', 
+            '申': '金', '酉': '金', '戌': '土', '亥': '水'
+        };
+
+        // 五行生克关系
+        const FIVE_ELEMENTS_RELATION = {
+            '生': { '木': '火', '火': '土', '土': '金', '金': '水', '水': '木' },
+            '克': { '木': '土', '土': '水', '水': '火', '火': '金', '金': '木' }
+        };
+
+        // 六十甲子
+        const SIXTY_CYCLE = [
+            '甲子', '乙丑', '丙寅', '丁卯', '戊辰', '己巳', '庚午', '辛未', '壬申', '癸酉',
+            '甲戌', '乙亥', '丙子', '丁丑', '戊寅', '己卯', '庚辰', '辛巳', '壬午', '癸未',
+            '甲申', '乙酉', '丙戌', '丁亥', '戊子', '己丑', '庚寅', '辛卯', '壬辰', '癸巳',
+            '甲午', '乙未', '丙申', '丁酉', '戊戌', '己亥', '庚子', '辛丑', '壬寅', '癸卯',
+            '甲辰', '乙巳', '丙午', '丁未', '戊申', '己酉', '庚戌', '辛亥', '壬子', '癸丑',
+            '甲寅', '乙卯', '丙辰', '丁巳', '戊午', '己未', '庚申', '辛酉', '壬戌', '癸亥'
+        ];
+
+        const RELATION_DICTS = {
+            chong: {
+                '子-午': '歌诀：子午相冲身不安 火光血灾泪心酸\n\n断语：求事不成。出头病、心病、妇科病、喧争。',
+                '丑-未': '歌诀：丑未烦恼生气多 仇恨外姓婚不和\n\n断语：遇事生闷气、仇恨，家住外姓人，子孙多残疾，婚变，搬迁。',
+                '寅-申': '歌诀：寅申相冲多损财 道路车马带伤来\n\n断语：路途撞车，车马有伤，商途逢贼，外人争财，远信急等。',
+                '卯-酉': '歌诀：卯酉相冲伤四肢 车祸外人女阴私\n\n断语：出车祸，车惊，外人寻事，迁居败门，女人阴私，盗贼等。',
+                '辰-戌': '歌诀：辰戌相冲有纠纷 口舌官司后不顺\n\n断语：出争讼，口舌，是非，兄弟不和，后代不兴旺。',
+                '巳-亥': '歌诀：巳亥相冲主生气 妇女争权婚姻戏\n\n断语：出盗贼，妇女绕舌，争权，婚姻不顺。'
+            },
+            hai: {
+                '子-未': '子未相害：主谋害，劳而无功被排挤，官司受害受压制，夫妻不和闹分离。',
+                '丑-午': '丑午相害：主谋害，劳而无功被排挤，官司受害受压制，夫妻不和闹分离。',
+                '寅-巳': '寅巳相害：主谋害，劳而无功被排挤，官司受害受压制，夫妻不和闹分离。',
+                '卯-辰': '卯辰相害：主谋害，劳而无功被排挤，官司受害受压制，夫妻不和闹分离。',
+                '申-亥': '申亥相害：主谋害，劳而无功被排挤，官司受害受压制，夫妻不和闹分离。',
+                '酉-戌': '酉戌相害：主谋害，劳而无功被排挤，官司受害受压制，夫妻不和闹分离。'
+            },
+            he: {
+                '六合': '六合关系：流年四柱逢亡。主合作共赢，情感和顺。'
+            }
+        };
+
+        const JUDGMENT_PRINCIPLES = {
+            '大吉': { title: '判断总纲：○ 大吉', desc: '子午卯酉宫位所属', dimensions: [{ label: '问测', value: '百事顺吉' }, { label: '病灾', value: '比较严重' }, { label: '场所', value: '热闹处所' }, { label: '时间', value: '远地●远时' }], color: 'text-green-600', bg: 'bg-green-50', accent: 'bg-green-100' },
+            '大凶': { title: '判断总纲：● 大凶', desc: '辰戌丑未宫位所属', dimensions: [{ label: '问测', value: '问事难成' }, { label: '病灾', value: '以轻为主' }, { label: '场所', value: '公寓静区' }, { label: '时间', value: '近地●近期' }], color: 'text-red-600', bg: 'bg-red-50', accent: 'bg-red-100' },
+            '半吉': { title: '判断总纲：▲ 半凶半吉', desc: '寅申巳亥宫位所属', dimensions: [{ label: '问测', value: '努力才成' }, { label: '病灾', value: '不轻不重' }, { label: '场所', value: '路宅巷子' }, { label: '时间', value: '远近之间' }], color: 'text-amber-600', bg: 'bg-amber-50', accent: 'bg-amber-100' }
+        };
+
+        const PALACE_MEANINGS = {
+            '命宫': { focus: '性格气质', desc: '排布预测项目的起点之神', icon: 'user' },
+            '兄弟': { focus: '手足合作伙伴', desc: '兄弟，姐妹，朋友，同辈，排行，伙伴，同学', icon: 'users' },
+            '夫妻': { focus: '感情配偶', desc: '配偶，婚姻，隐私，离合，情感，男女，好坏', icon: 'star' },
+            '子女': { focus: '后代晚辈', desc: '子女，子孙，六甲，晚辈，侄子，女婿，徒生', icon: 'users' },
+            '财帛': { focus: '财富资财', desc: '经济，交易，财运，钱财，债务，求财，盈亏', icon: 'zap' },
+            '疾厄': { focus: '健康灾病', desc: '病痛，伤灾，犯碍，诊治，疗效，生死，寿元', icon: 'activity' },
+            '迁移': { focus: '外出环境', desc: '搬迁，调动，出行，寻人，失物，盗贼，上任', icon: 'map-pin' },
+            '奴仆': { focus: '交友下属', desc: '下人，顾工，保姆，打工，清洁工，临时工', icon: 'users' },
+            '官禄': { focus: '事业职位', desc: '考试，升学，功名，前程，求官，官运，职业', icon: 'zap' },
+            '田宅': { focus: '祖业房产', desc: '家业，田地，财产，物质，住宅，坟墓，天气', icon: 'home' },
+            '福德': { focus: '精神生活', desc: '祖先，诉讼，福气，时运，运程，贵人，缘份', icon: 'star' },
+            '父母': { focus: '长辈文书', desc: '祖上，父母，领导，官员，公安，神灵，鬼怪', icon: 'book-open' }
+        };
+
+        const BRANCH_DETAILS = {
+            '子': { 
+                阴阳: '阳', 五行: '水', 生肖: '鼠', 
+                八卦方位: '坎 正北', 
+                人物: '中男 军人 盗贼 淫者', 
+                场所: '水道 暗沟 水井 公路', 
+                疾病: '膀胱 耳 血 肾'
+            },
+            '丑': { 
+                阴阳: '阴', 五行: '土', 生肖: '牛', 
+                八卦方位: '艮 东北', 
+                人物: '少男 强暴者 贤士', 
+                场所: '稻田 宫殿 坟场 金场', 
+                疾病: '肚 脾 胃'
+            },
+            '寅': { 
+                阴阳: '阳', 五行: '木', 生肖: '虎', 
+                八卦方位: '艮 东北', 
+                人物: '少男 医生 官者', 
+                场所: '佛地 深山 高楼', 
+                疾病: '胆 手足 四肢'
+            },
+            '卯': { 
+                阴阳: '阴', 五行: '木', 生肖: '兔', 
+                八卦方位: '震 正东', 
+                人物: '长男 同辈 司机', 
+                场所: '花园 门窗 街道', 
+                疾病: '肝 四肢 神经'
+            },
+            '辰': { 
+                阴阳: '阳', 五行: '土', 生肖: '龙', 
+                八卦方位: '巽 东南', 
+                人物: '长女 医生 术士 气功', 
+                场所: '水库 井池 沟厕', 
+                疾病: '胸 胃 皮肤'
+            },
+            '巳': { 
+                阴阳: '阳', 五行: '火', 生肖: '蛇', 
+                八卦方位: '巽 东南', 
+                人物: '长女 淫人 有权人', 
+                场所: '道路 寺庙 烟火场', 
+                疾病: '喉 眼 齿 股 心'
+            },
+            '午': { 
+                阴阳: '阴', 五行: '火', 生肖: '马', 
+                八卦方位: '离 正南', 
+                人物: '中女 利禄者 富人', 
+                场所: '窑灶 厅堂 体育场', 
+                疾病: '头 眼 心 乳 血'
+            },
+            '未': { 
+                阴阳: '阴', 五行: '土', 生肖: '羊', 
+                八卦方位: '坤 西南', 
+                人物: '老母 女警 当家人', 
+                场所: '花园 千井 坟场 酒店', 
+                疾病: '脾胃 皮肤肌肉'
+            },
+            '申': { 
+                阴阳: '阳', 五行: '金', 生肖: '猴', 
+                八卦方位: '坤 西南', 
+                人物: '老女 军警 武者', 
+                场所: '祖堂 大路 金属场', 
+                疾病: '肺 肠 呼吸'
+            },
+            '酉': { 
+                阴阳: '阴', 五行: '金', 生肖: '鸡', 
+                八卦方位: '兑 正西', 
+                人物: '少女 小姐 年少女', 
+                场所: '街巷 鸡场 寺庙', 
+                疾病: '肺 小肠 精血'
+            },
+            '戌': { 
+                阴阳: '阳', 五行: '土', 生肖: '狗', 
+                八卦方位: '乾 西北', 
+                人物: '老父 领导 医生', 
+                场所: '油站 电场 牢房 山岗', 
+                疾病: '眼 胃 命门'
+            },
+            '亥': { 
+                阴阳: '阴', 五行: '水', 生肖: '猪', 
+                八卦方位: '乾 西北', 
+                人物: '老男 长辈 政权 妄者', 
+                场所: '厕所 水沟 畜栏 仓库', 
+                疾病: '肉 血液 生殖'
+            }
+        };
+
+        // 空亡计算函数
+        const calculateKongWang = (dayStem, dayBranch) => {
+            const dayGanZhi = dayStem + dayBranch;
+            const index = SIXTY_CYCLE.indexOf(dayGanZhi);
+            if (index === -1) return [];
+            
+            // 计算旬首索引（每10个为一旬）
+            const xunShouIndex = Math.floor(index / 10) * 10;
+            const xunShou = SIXTY_CYCLE[xunShouIndex];
+            const xunShouBranch = xunShou.charAt(1);
+            
+            // 计算空亡地支（旬首地支开始，跳过10个，剩下的2个就是空亡）
+            const startIndex = EARTHLY_BRANCHES.indexOf(xunShouBranch);
+            const kongWang = [];
+            for (let i = 10; i < 12; i++) {
+                const kongWangIndex = (startIndex + i) % 12;
+                kongWang.push(EARTHLY_BRANCHES[kongWangIndex]);
+            }
+            
+            return kongWang;
+        };
+
+        const RELATIONSHIPS = {
+            he: { '子': '丑', '丑': '子', '寅': '亥', '亥': '寅', '卯': '戌', '戌': '卯', '辰': '酉', '酉': '辰', '巳': '申', '申': '巳', '午': '未', '未': '午' },
+            chong: { '子': '午', '午': '子', '丑': '未', '未': '丑', '寅': '申', '申': '寅', '卯': '酉', '酉': '卯', '辰': '戌', '戌': '辰', '巳': '亥', '亥': '巳' },
+            hai: { '子': '未', '未': '子', '丑': '午', '午': '丑', '寅': '巳', '巳': '寅', '卯': '辰', '辰': '卯', '申': '亥', '亥': '申', '酉': '戌', '戌': '酉' },
+        };
+
+        const App = () => {
+            const [gender, setGender] = useState('男');
+            const [inputNum, setInputNum] = useState(1);
+            const [selectedYongShen, setSelectedYongShen] = useState(null);
+            const [bazi, setBazi] = useState({ yearStem: '甲', yearBranch: '戌', monthStem: '丙', monthBranch: '寅', dayStem: '戊', dayBranch: '午', hourStem: '庚', hourBranch: '申' });
+            const [picker, setPicker] = useState({ open: false, type: '', key: '' });
+            const [popover, setPopover] = useState({ open: false, content: null, title: '', subtitle: '', type: '' });
+            const [queryContent, setQueryContent] = useState('');
+            const [judgmentRecord, setJudgmentRecord] = useState('');
+            const [cases, setCases] = useState([]);
+            const [caseLibraryOpen, setCaseLibraryOpen] = useState(false);
+            const [caseSearchKeyword, setCaseSearchKeyword] = useState('');
+            const [searchResults, setSearchResults] = useState([]);
+
+            const mingGongBranch = useMemo(() => EARTHLY_BRANCHES[(inputNum - 1) % 12], [inputNum]);
+            const tableData = useMemo(() => {
+                const startIdx = EARTHLY_BRANCHES.indexOf(mingGongBranch);
+                const mapping = {};
+                YONG_SHEN_ORDER.forEach((name, i) => {
+                    let currentIdx = gender === '男' ? (startIdx + i) % 12 : (startIdx - i + 12) % 12;
+                    mapping[EARTHLY_BRANCHES[currentIdx]] = name;
+                });
+                return EARTHLY_BRANCHES.map(branch => ({ 
+                    branch, 
+                    yongShen: mapping[branch], 
+                    type: ['子', '午', '卯', '酉'].includes(branch) ? '○ 大吉' : ['辰', '戌', '丑', '未'].includes(branch) ? '● 大凶' : '▲ 半吉' 
+                }));
+            }, [mingGongBranch, gender]);
+
+            const showRelationDuanYu = (type, baziPos, baziBranch, targetBranch) => {
+                // 确保地支按照固定顺序排序，无论输入顺序如何
+                const sortedBranches = [baziBranch, targetBranch].sort((a, b) => {
+                    const order = ['子', '丑', '寅', '卯', '辰', '巳', '午', '未', '申', '酉', '戌', '亥'];
+                    return order.indexOf(a) - order.indexOf(b);
+                });
+                const pairKey = sortedBranches.join('-');
+                
+                let content = "";
+                if (type === 'chong') content = RELATION_DICTS.chong[pairKey] || "相冲：主冲动、不安、冲突。";
+                else if (type === 'hai') content = RELATION_DICTS.hai[pairKey] || RELATION_DICTS.hai['子-未'];
+                else if (type === 'he') content = RELATION_DICTS.he['六合'];
+
+                setPopover({
+                    open: true,
+                    title: `【${type === 'he' ? '六合' : type === 'chong' ? '六冲' : '六害'}】校对断语`,
+                    subtitle: `${baziPos}支(${baziBranch}) 与 落宫(${targetBranch}) 相互作用`,
+                    content: <div className="p-5 bg-red-50/50 rounded-2xl border border-red-100 text-sm leading-relaxed text-red-900 font-medium whitespace-pre-line">{content}</div>,
+                    type: type === 'he' ? 'good' : 'bad'
+                });
+            };
+
+            const showXiangYi = (val) => {
+                const data = PALACE_MEANINGS[val];
+                setPopover({
+                    open: true,
+                    title: `${val}宫职能`,
+                    subtitle: `核心关注：${data.focus}`,
+                    content: <p className="text-neutral-600 leading-relaxed italic p-4 bg-red-50 rounded-2xl">"{data.desc}"</p>,
+                    type: 'info'
+                });
+            };
+
+            const showBranchDetails = (branch) => {
+                const details = BRANCH_DETAILS[branch];
+                setPopover({
+                    open: true,
+                    title: `${branch}地支信息`,
+                    subtitle: `阴阳：${details.阴阳} | 五行：${details.五行} | 生肖：${details.生肖}`,
+                    content: (
+                        <div className="space-y-3">
+                            <p className="text-neutral-600"><strong>八卦方位：</strong>{details.八卦方位}</p>
+                            <p className="text-neutral-600"><strong>人物：</strong>{details.人物}</p>
+                            <p className="text-neutral-600"><strong>场所：</strong>{details.场所}</p>
+                            <p className="text-neutral-600"><strong>疾病：</strong>{details.疾病}</p>
+                        </div>
+                    ),
+                    type: 'info'
+                });
+            };
+
+            // 保存案例
+            const saveCase = () => {
+                if (!analysis || !queryContent.trim()) return;
+                
+                const newCase = {
+                    id: Date.now(),
+                    title: queryContent.split('\n')[0] || '未命名案例',
+                    queryContent,
+                    judgmentRecord,
+                    bazi,
+                    gender,
+                    inputNum,
+                    selectedYongShen,
+                    analysis: {
+                        target: analysis.target,
+                        matrix: analysis.matrix,
+                        generateRelation: analysis.generateRelation,
+                        kongWang: analysis.kongWang,
+                        isKongWang: analysis.isKongWang
+                    },
+                    date: new Date().toISOString().split('T')[0]
+                };
+                
+                const updatedCases = [...cases, newCase];
+                setCases(updatedCases);
+                
+                // 显示保存成功提示
+                setPopover({
+                    open: true,
+                    title: '保存成功',
+                    subtitle: '',
+                    content: <div className="p-5 bg-green-50 rounded-2xl border border-green-100 text-sm leading-relaxed text-green-900 font-medium">案例已成功保存到案例库！</div>,
+                    type: 'info'
+                });
+            };
+
+            // 删除案例
+            const deleteCase = (caseId) => {
+                const updatedCases = cases.filter(c => c.id !== caseId);
+                setCases(updatedCases);
+                setSearchResults(updatedCases);
+            };
+
+            // 还原案例
+            const restoreCase = (c) => {
+                setGender(c.gender);
+                setInputNum(c.inputNum);
+                setBazi(c.bazi);
+                setQueryContent(c.queryContent);
+                setJudgmentRecord(c.judgmentRecord);
+                setSelectedYongShen(c.selectedYongShen);
+                setCaseLibraryOpen(false);
+            };
+
+            // 生成随机八字
+            const generateRandomBazi = () => {
+                const generateRandomPair = () => {
+                    // 随机生成天干
+                    const randomStem = HEAVENLY_STEMS[Math.floor(Math.random() * HEAVENLY_STEMS.length)];
+                    const stemYinYang = STEM_YIN_YANG[randomStem];
+                    
+                    // 随机生成与天干阴阳相同的地支
+                    const compatibleBranches = EARTHLY_BRANCHES.filter(branch => BRANCH_YIN_YANG[branch] === stemYinYang);
+                    const randomBranch = compatibleBranches[Math.floor(Math.random() * compatibleBranches.length)];
+                    
+                    return { stem: randomStem, branch: randomBranch };
+                };
+                
+                const year = generateRandomPair();
+                const month = generateRandomPair();
+                const day = generateRandomPair();
+                const hour = generateRandomPair();
+                
+                setBazi({
+                    yearStem: year.stem,
+                    yearBranch: year.branch,
+                    monthStem: month.stem,
+                    monthBranch: month.branch,
+                    dayStem: day.stem,
+                    dayBranch: day.branch,
+                    hourStem: hour.stem,
+                    hourBranch: hour.branch
+                });
+            };
+
+            // 搜索案例
+            const searchCases = () => {
+                if (!caseSearchKeyword.trim()) {
+                    setSearchResults(cases);
+                    return;
+                }
+                
+                const keyword = caseSearchKeyword.toLowerCase();
+                const results = cases.filter(c => 
+                    c.title.toLowerCase().includes(keyword) ||
+                    c.queryContent.toLowerCase().includes(keyword) ||
+                    c.analysis.target.yongShen.toLowerCase().includes(keyword)
+                );
+                setSearchResults(results);
+            };
+
+            // 重置搜索
+            const resetSearch = () => {
+                setCaseSearchKeyword('');
+                setSearchResults(cases);
+            };
+
+            // 打开案例库
+            const openCaseLibrary = () => {
+                setSearchResults(cases);
+                setCaseLibraryOpen(true);
+            };
+
+            const analysis = useMemo(() => {
+                if (!selectedYongShen) return null;
+                const target = tableData.find(d => d.branch === selectedYongShen);
+                const baziBranches = [{ key: '年', val: bazi.yearBranch }, { key: '月', val: bazi.monthBranch }, { key: '日', val: bazi.dayBranch }, { key: '时', val: bazi.hourBranch }].filter(b => b.val);
+                
+                const matrix = baziBranches.map(b => {
+                    let relationship = '无';
+                    let type = 'neutral';
+                    let relKey = '';
+                    if (RELATIONSHIPS.he[selectedYongShen] === b.val) { relationship = '六合'; type = 'good'; relKey = 'he'; }
+                    else if (RELATIONSHIPS.chong[selectedYongShen] === b.val) { relationship = '相冲'; type = 'bad'; relKey = 'chong'; }
+                    else if (RELATIONSHIPS.hai[selectedYongShen] === b.val) { relationship = '相害'; type = 'bad'; relKey = 'hai'; }
+                    return { pos: b.key, branch: b.val, relationship, type, relKey };
+                });
+
+                // 计算生克关系
+                const generateRelation = matrix.map(item => {
+                    const myElement = BRANCH_ELEMENTS[selectedYongShen];
+                    const otherElement = BRANCH_ELEMENTS[item.branch];
+                    
+                    if (myElement === otherElement) {
+                        return '比合';
+                    } else if (FIVE_ELEMENTS_RELATION['生'][otherElement] === myElement) {
+                        return '生我';
+                    } else if (FIVE_ELEMENTS_RELATION['生'][myElement] === otherElement) {
+                        return '我生';
+                    } else if (FIVE_ELEMENTS_RELATION['克'][otherElement] === myElement) {
+                        return '克我';
+                    } else if (FIVE_ELEMENTS_RELATION['克'][myElement] === otherElement) {
+                        return '我克';
+                    } else {
+                        return '无';
+                    }
+                });
+
+                // 计算空亡
+                const kongWang = calculateKongWang(bazi.dayStem, bazi.dayBranch);
+                const isKongWang = kongWang.includes(selectedYongShen);
+
+                return { target, matrix, generateRelation, kongWang, isKongWang };
+            }, [selectedYongShen, tableData, bazi]);
+
+            return (
+                <div className="min-h-screen p-4 md:p-8">
+                    <div className="max-w-5xl mx-auto space-y-6">
+                        <header className="mb-8">
+                            <h1 className="text-3xl font-serif font-bold text-red-900">鬼谷神掌 · 离线排盘</h1>
+                            <p className="text-[10px] text-neutral-400 tracking-widest uppercase">Palace Prediction Export Version</p>
+                        </header>
+
+                        {/* 输入面板 */}
+                        <div className="space-y-6">
+                            {/* 性别和数字输入 */}
+                            <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-neutral-100">
+                                <div className="space-y-4">
+                                    <div className="flex bg-neutral-50 p-1 rounded-2xl">
+                                        {['男', '女'].map(g => (
+                                            <button key={g} onClick={() => setGender(g)} className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all ${gender === g ? 'bg-white text-red-900 shadow-sm' : 'text-neutral-400'}`}>{g}</button>
+                                        ))}
+                                    </div>
+                                    <div className="flex justify-center gap-2">
+                                        <input type="number" value={inputNum} onChange={(e) => setInputNum(parseInt(e.target.value) || 1)} className="w-11/12 px-4 py-3 bg-neutral-50 rounded-2xl font-bold outline-none border border-transparent focus:border-red-100" />
+                                        <button onClick={() => setInputNum(Math.floor(Math.random()*12)+1)} className="p-3 bg-red-50 text-red-600 rounded-2xl"><Icon name="dices" className="w-5 h-5"/></button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            {/* 八字输入 */}
+                            <div className="bg-white p-6 rounded-[2rem] border border-neutral-100">
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                                    {['year', 'month', 'day', 'hour'].map((k, idx) => (
+                                        <div key={k} className="space-y-2">
+                                            <div className="relative">
+                                                <div onClick={() => setPicker({ open: true, type: 'stem', key: `${k}Stem`, pairKey: `${k}Branch` })} className="h-12 bg-indigo-50/50 rounded-xl border border-indigo-100 flex items-center justify-center cursor-pointer text-base sm:text-lg font-serif font-bold">{bazi[`${k}Stem`] ? <span className="text-indigo-900">{bazi[`${k}Stem`]}</span> : <span className="text-neutral-400">干</span>}</div>
+                                                {bazi[`${k}Stem`] && (
+                                                    <button onClick={(e) => { e.stopPropagation(); setBazi({...bazi, [`${k}Stem`]: '' }); }} className="absolute top-1 right-1 w-6 h-6 bg-white/80 rounded-full flex items-center justify-center text-xs font-bold text-neutral-400 hover:text-red-500 hover:bg-white transition-colors">
+                                                        ×
+                                                    </button>
+                                                )}
+                                            </div>
+                                            <div className="relative">
+                                                <div onClick={() => setPicker({ open: true, type: 'branch', key: `${k}Branch`, pairKey: `${k}Stem` })} className="h-12 bg-neutral-50 rounded-xl border border-neutral-100 flex items-center justify-center cursor-pointer text-base sm:text-lg font-serif font-bold">{bazi[`${k}Branch`] ? <span className="text-neutral-800">{bazi[`${k}Branch`]}</span> : <span className="text-neutral-400">支</span>}</div>
+                                                {bazi[`${k}Branch`] && (
+                                                    <button onClick={(e) => { e.stopPropagation(); setBazi({...bazi, [`${k}Branch`]: '' }); }} className="absolute top-1 right-1 w-6 h-6 bg-white/80 rounded-full flex items-center justify-center text-xs font-bold text-neutral-400 hover:text-red-500 hover:bg-white transition-colors">
+                                                        ×
+                                                    </button>
+                                                )}
+                                            </div>
+                                            <div className="text-[10px] text-neutral-300 font-bold uppercase text-center">{['年','月','日','时'][idx]}</div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* 排盘表 */}
+                        <div className="bg-white rounded-[2rem] border border-neutral-100 shadow-sm overflow-x-auto">
+                            <table className="w-full text-center min-w-[600px] sm:min-w-[800px]">
+                                <thead>
+                                    <tr className="bg-neutral-50/50">
+                                        <th className="p-3 sm:p-4 text-[10px] text-neutral-300 border-r whitespace-nowrap">用神</th>
+                                        {tableData.map((d, i) => (
+                                            <th key={i} onClick={() => showXiangYi(d.yongShen)} className="p-3 sm:p-4 text-xs sm:text-sm font-bold text-red-900 border-r cursor-help hover:bg-red-50 whitespace-nowrap">{d.yongShen}</th>
+                                        ))}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td className="p-3 sm:p-4 text-[10px] text-neutral-300 border-r whitespace-nowrap">地盘</td>
+                                        {tableData.map((d, i) => (
+                                            <td key={i} onClick={() => setSelectedYongShen(d.branch)} className={`p-3 sm:p-4 border-r cursor-pointer transition-all ${selectedYongShen === d.branch ? 'bg-red-50' : 'hover:bg-neutral-50'}`}>
+                                                <div className="text-lg sm:text-xl font-serif font-bold text-neutral-800">{d.branch}</div>
+                                                <div className={`text-[10px] mt-1 font-bold ${d.type.includes('吉') ? 'text-green-600' : d.type.includes('凶') ? 'text-red-600' : 'text-amber-600'}`}>{d.type.split(' ')[1]}</div>
+                                            </td>
+                                        ))}
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {/* 分析结果 */}
+                        {analysis && (
+                            <div className="bg-white p-6 sm:p-8 rounded-[3rem] border border-neutral-100 shadow-sm animate-in slide-in-from-bottom-4">
+                                {/* 宫位信息 */}
+                                <div className="text-center mb-6">
+                                    <div onClick={() => showXiangYi(analysis.target.yongShen)} className="text-4xl sm:text-6xl font-serif font-bold text-red-900 cursor-pointer hover:text-red-700 transition-colors">{analysis.target.yongShen}</div>
+                                    <div className="flex flex-wrap justify-center gap-2 mt-4">
+                                        <div onClick={() => showBranchDetails(selectedYongShen)} className="px-4 py-1 bg-neutral-100 rounded-full text-xs font-bold cursor-pointer hover:bg-neutral-200 transition-colors">落宫: {selectedYongShen}</div>
+                                        <div className={`px-4 py-1 rounded-full text-xs font-bold ${analysis.isKongWang ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>{analysis.isKongWang ? '空亡' : '非空亡'}</div>
+                                        <div className="px-4 py-1 bg-neutral-50 rounded-full text-xs font-bold text-neutral-600">空亡: {analysis.kongWang.join('、')}</div>
+                                    </div>
+                                </div>
+                                
+                                {/* 吉凶信息 */}
+                                <div className="mb-6 text-center">
+                                    <h4 onClick={() => {
+                                        const type = analysis.target.type.split(' ')[1];
+                                        const data = JUDGMENT_PRINCIPLES[type];
+                                        setPopover({
+                                            open: true,
+                                            title: data.title,
+                                            subtitle: data.desc,
+                                            content: (
+                                                <div className="space-y-3">
+                                                    {data.dimensions.map((item, idx) => (
+                                                        <p key={idx} className="text-neutral-600"><strong>{item.label}：</strong>{item.value}</p>
+                                                    ))}
+                                                </div>
+                                            ),
+                                            type: 'info'
+                                        });
+                                    }} className={`text-xl sm:text-2xl font-black cursor-pointer hover:opacity-80 transition-opacity ${analysis.target.type.includes('吉') ? 'text-green-600' : analysis.target.type.includes('凶') ? 'text-red-600' : 'text-amber-600'}`}>{analysis.target.type}</h4>
+                                </div>
+                                
+                                {/* 关系表格 */}
+                                <div className="bg-neutral-50 rounded-xl border border-neutral-100 overflow-hidden">
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full text-center text-xs sm:text-sm table-fixed">
+                                            <thead>
+                                                <tr className="bg-neutral-100/50">
+                                                    {analysis.matrix.map((row, i) => (
+                                                        <th key={i} className="p-2 sm:p-3 border-r h-8 sm:h-10 whitespace-nowrap">{row.pos}支({row.branch})</th>
+                                                    ))}
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <tr>
+                                                    {analysis.matrix.map((row, i) => (
+                                                        <td key={i} className="p-2 sm:p-3 border-r h-8 sm:h-10 whitespace-nowrap">
+                                                            <button onClick={() => row.type !== 'neutral' && showRelationDuanYu(row.relKey, row.pos, row.branch, selectedYongShen)} className={`px-2 py-1 rounded font-bold text-xs sm:text-sm ${row.type === 'good' ? 'bg-green-100 text-green-700' : row.type === 'bad' ? 'bg-red-100 text-red-700' : 'bg-neutral-200 text-neutral-400 cursor-default'}`}>{row.relationship}</button>
+                                                        </td>
+                                                    ))}
+                                                </tr>
+                                                <tr>
+                                                    {analysis.generateRelation.map((relation, i) => (
+                                                        <td key={i} className="p-2 sm:p-3 border-r h-8 sm:h-10 whitespace-nowrap">
+                                                            <div className={`px-2 py-1 rounded font-bold text-xs sm:text-sm ${(relation === '生我' || relation === '比合') ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{relation}</div>
+                                                        </td>
+                                                    ))}
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* 求测内容和断语记录 */}
+                        <div className="space-y-6">
+                            {/* 求测内容 */}
+                            <div className="bg-white p-6 rounded-[2rem] border border-neutral-100 shadow-sm">
+                                <h3 className="text-base sm:text-lg font-bold text-neutral-800 mb-4">求测内容：</h3>
+                                <textarea 
+                                    value={queryContent}
+                                    onChange={(e) => setQueryContent(e.target.value)}
+                                    placeholder="请输入求测标题和问题（如：财运如何？近期能否有收入增加？）"
+                                    className="w-full p-4 border border-neutral-200 rounded-xl focus:outline-none focus:border-red-100 text-sm"
+                                    rows={4}
+                                ></textarea>
+                            </div>
+
+                            {/* 断语记录 */}
+                            <div className="bg-white p-6 rounded-[2rem] border border-neutral-100 shadow-sm">
+                                <h3 className="text-base sm:text-lg font-bold text-neutral-800 mb-4">断语记录：</h3>
+                                <textarea 
+                                    value={judgmentRecord}
+                                    onChange={(e) => setJudgmentRecord(e.target.value)}
+                                    placeholder="记录断卦思路和理由..."
+                                    className="w-full p-4 border border-neutral-200 rounded-xl focus:outline-none focus:border-red-100 text-sm"
+                                    rows={4}
+                                ></textarea>
+                            </div>
+                        </div>
+
+                        {/* 功能按钮 */}
+                        <div className="flex flex-col sm:flex-row gap-4 justify-center mt-6">
+                            <button onClick={saveCase} disabled={!analysis || !queryContent.trim()} className={`flex-1 py-4 px-6 rounded-xl font-bold transition-colors ${(!analysis || !queryContent.trim()) ? 'bg-neutral-300 text-neutral-500 cursor-not-allowed' : 'bg-red-800 text-white hover:bg-red-700'}`}>保存案例</button>
+                            <button onClick={openCaseLibrary} className="flex-1 py-4 px-6 bg-blue-500 text-white rounded-xl font-bold hover:bg-blue-600 transition-colors">案例库</button>
+                        </div>
+
+                    </div>
+
+                    {/* 弹窗 */}
+                    {popover.open && (
+                        <div className="fixed inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setPopover({...popover, open: false})}>
+                            <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-sm p-8" onClick={e => e.stopPropagation()}>
+                                <div className="flex justify-between items-start mb-6">
+                                    <div>
+                                        <h4 className="text-lg font-bold">{popover.title}</h4>
+                                        <p className="text-[10px] text-neutral-400 uppercase tracking-widest">{popover.subtitle}</p>
+                                    </div>
+                                    <button onClick={() => setPopover({...popover, open: false})}><Icon name="x" className="w-5 h-5 text-neutral-300"/></button>
+                                </div>
+                                <div>{popover.content}</div>
+                                <button onClick={() => setPopover({...popover, open: false})} className="w-full mt-8 py-3 bg-neutral-900 text-white rounded-xl text-xs font-bold">了解</button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 案例库弹窗 */}
+                    {caseLibraryOpen && (
+                        <div className="fixed inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setCaseLibraryOpen(false)}>
+                            <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+                                <div className="p-6 sm:p-8 border-b border-neutral-100">
+                                    <div className="flex justify-between items-start mb-6">
+                                        <h4 className="text-lg sm:text-xl font-bold text-red-900">案例库</h4>
+                                        <button onClick={() => setCaseLibraryOpen(false)}><Icon name="x" className="w-5 h-5 text-neutral-300"/></button>
+                                    </div>
+                                    
+                                    {/* 搜索功能 */}
+                                    <div className="space-y-4">
+                                        <div>
+                                            <h5 className="text-base sm:text-lg font-bold text-neutral-800 mb-2">案例搜索</h5>
+                                            <div className="flex flex-col sm:flex-row gap-2">
+                                                <input 
+                                                    type="text" 
+                                                    value={caseSearchKeyword}
+                                                    onChange={(e) => setCaseSearchKeyword(e.target.value)}
+                                                    placeholder="输入关键词搜索案例（可搜索标题、问题、宫位等）"
+                                                    className="flex-1 px-4 py-3 bg-neutral-50 rounded-xl border border-neutral-200 focus:outline-none focus:border-red-100 text-sm"
+                                                />
+                                                <div className="flex gap-2 sm:gap-2">
+                                                    <button onClick={searchCases} className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-colors">搜索</button>
+                                                    <button onClick={resetSearch} className="flex-1 px-4 py-3 bg-green-600 text-white rounded-xl font-bold hover:bg-green-700 transition-colors">重置</button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <p className="text-xs text-neutral-400">搜索提示：可搜索标题、问题、宫位名称等内容</p>
+                                    </div>
+                                </div>
+                                
+                                {/* 案例列表 */}
+                                <div className="p-6 sm:p-8">
+                                    <h5 className="text-base sm:text-lg font-bold text-neutral-800 mb-4">案例列表</h5>
+                                    
+                                    {searchResults.length === 0 ? (
+                                        <div className="p-8 bg-neutral-50 rounded-xl text-center">
+                                            <p className="text-neutral-500">暂无案例</p>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-4">
+                                            {searchResults.map(c => (
+                                                <div key={c.id} onClick={() => restoreCase(c)} className="p-4 bg-neutral-50 rounded-xl border border-neutral-100 cursor-pointer hover:bg-neutral-100 transition-colors">
+                                                    <div className="flex justify-between items-start mb-2">
+                                                        <h6 className="text-base sm:text-lg font-bold text-blue-700">{c.title}</h6>
+                                                        <div className="flex gap-2">
+                                                            <span className="text-xs text-neutral-400">{c.date}</span>
+                                                            <button onClick={(e) => { e.stopPropagation(); deleteCase(c.id); }} className="text-xs text-red-500 hover:text-red-700 transition-colors">删除</button>
+                                                        </div>
+                                                    </div>
+                                                    <p className="text-sm text-neutral-600 mb-2 line-clamp-2">求测问题：{c.queryContent}</p>
+                                                    <p className="text-sm text-neutral-600 mb-2">用宫：{c.analysis.target.yongShen}</p>
+                                                    <p className="text-xs text-neutral-500">性别：{c.gender} | 数字：{c.inputNum} | 落宫：{c.selectedYongShen}</p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 选择器 */}
+                    {picker.open && (
+                        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setPicker({open:false})}>
+                            <div className="bg-white rounded-[2rem] p-8 max-w-sm w-full grid grid-cols-4 gap-3" onClick={e => e.stopPropagation()}>
+                                {(() => {
+                                    const pairValue = bazi[picker.pairKey];
+                                    if (picker.type === 'stem') {
+                                        // 选择天干时，检查对应地支是否已选
+                                        if (pairValue) {
+                                            const branchYinYang = BRANCH_YIN_YANG[pairValue];
+                                            // 只显示与地支阴阳相同的天干
+                                            return HEAVENLY_STEMS.filter(stem => STEM_YIN_YANG[stem] === branchYinYang);
+                                        }
+                                        return HEAVENLY_STEMS;
+                                    } else {
+                                        // 选择地支时，检查对应天干是否已选
+                                        if (pairValue) {
+                                            const stemYinYang = STEM_YIN_YANG[pairValue];
+                                            // 只显示与天干阴阳相同的地支
+                                            return EARTHLY_BRANCHES.filter(branch => BRANCH_YIN_YANG[branch] === stemYinYang);
+                                        }
+                                        return EARTHLY_BRANCHES;
+                                    }
+                                })().map(val => (
+                                    <button key={val} onClick={() => { setBazi({...bazi, [picker.key]: val}); setPicker({open:false}); }} className="p-4 bg-neutral-50 rounded-xl text-2xl font-serif font-bold hover:bg-red-900 hover:text-white transition-colors">{val}</button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
 </html>
