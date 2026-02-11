@@ -108,6 +108,12 @@
                 '丑未戌': '丑未戍刑——流年四柱逢。为仗势刑，暗计害人。',
                 '子卯': '子一卯刑——流年四柱逄。为无礼刑，取闹官司。',
                 '自刑': '辰酉亥午——自刑四柱逄。为自刑，自杀官凶。'
+            },
+            jue: {
+                '寅-酉': '寅酉金绝在文道——流时逄。主道路伤灾。',
+                '卯-申': '卯申木绝车马财——流时逄。主车伤，盗贼。',
+                '午-亥': '午亥水绝因口舌——流时逄。主口舌，官司。',
+                '子-巳': '子巳火绝妇女男——流时逄。主休囚受绝。'
             }
         };
 
@@ -256,6 +262,12 @@
                 '丑': ['未', '戌'], '未': ['丑', '戌'], '戌': ['丑', '未'],
                 '子': ['卯'], '卯': ['子'],
                 '辰': ['辰'], '午': ['午'], '酉': ['酉'], '亥': ['亥']
+            },
+            jue: {
+                '寅': '酉', '酉': '寅',
+                '卯': '申', '申': '卯',
+                '午': '亥', '亥': '午',
+                '子': '巳', '巳': '子'
             }
         };
 
@@ -342,6 +354,9 @@
                     
                     content = RELATION_DICTS.sanxing[sanxingKey] || "三刑关系：主刑伤、纠纷。";
                     title = "三刑";
+                } else if (type === 'jue') {
+                    content = RELATION_DICTS.jue[pairKey] || "相绝关系：主阻滞、不顺。";
+                    title = "相绝";
                 }
 
                 setPopover({
@@ -511,6 +526,8 @@
                     else if (RELATIONSHIPS.chong[selectedYongShen] === b.val) { relationship = '相冲'; type = 'bad'; relKey = 'chong'; }
                     // 检查相害
                     else if (RELATIONSHIPS.hai[selectedYongShen] === b.val) { relationship = '相害'; type = 'bad'; relKey = 'hai'; }
+                    // 检查相绝
+                    else if (RELATIONSHIPS.jue[selectedYongShen] === b.val) { relationship = '相绝'; type = 'bad'; relKey = 'jue'; }
                     // 检查三合
                     else if (RELATIONSHIPS.sanhe[selectedYongShen] && RELATIONSHIPS.sanhe[selectedYongShen].includes(b.val)) {
                         // 收集所有相关地支
