@@ -96,6 +96,18 @@
             },
             he: {
                 '六合': '六合关系：流年四柱逢亡。主合作共赢，情感和顺。'
+            },
+            sanhe: {
+                '亥卯未': '亥卯未合——流年四柱逄亡。为交易，婚姻吉。',
+                '寅午戌': '寅午戌合——流年四柱逄亡。为财帛，文书吉。',
+                '巳酉丑': '巳酉丑合——流年四柱逄亡。为阴阳，淫乱之合。',
+                '申子辰': '申子辰合——流年四柱逄亡。为行移，斗讼吉。'
+            },
+            sanxing: {
+                '寅巳申': '寅巳申刑——流年四柱逢。为无恩刑，忘恩毒心。',
+                '丑未戌': '丑未戍刑——流年四柱逢。为仗势刑，暗计害人。',
+                '子卯': '子一卯刑——流年四柱逄。为无礼刑，取闹官司。',
+                '自刑': '辰酉亥午——自刑四柱逄。为自刑，自杀官凶。'
             }
         };
 
@@ -233,6 +245,18 @@
             he: { '子': '丑', '丑': '子', '寅': '亥', '亥': '寅', '卯': '戌', '戌': '卯', '辰': '酉', '酉': '辰', '巳': '申', '申': '巳', '午': '未', '未': '午' },
             chong: { '子': '午', '午': '子', '丑': '未', '未': '丑', '寅': '申', '申': '寅', '卯': '酉', '酉': '卯', '辰': '戌', '戌': '辰', '巳': '亥', '亥': '巳' },
             hai: { '子': '未', '未': '子', '丑': '午', '午': '丑', '寅': '巳', '巳': '寅', '卯': '辰', '辰': '卯', '申': '亥', '亥': '申', '酉': '戌', '戌': '酉' },
+            sanhe: {
+                '亥': ['卯', '未'], '卯': ['亥', '未'], '未': ['亥', '卯'],
+                '寅': ['午', '戌'], '午': ['寅', '戌'], '戌': ['寅', '午'],
+                '巳': ['酉', '丑'], '酉': ['巳', '丑'], '丑': ['巳', '酉'],
+                '申': ['子', '辰'], '子': ['申', '辰'], '辰': ['申', '子']
+            },
+            sanxing: {
+                '寅': ['巳', '申'], '巳': ['寅', '申'], '申': ['寅', '巳'],
+                '丑': ['未', '戌'], '未': ['丑', '戌'], '戌': ['丑', '未'],
+                '子': ['卯'], '卯': ['子'],
+                '辰': ['辰'], '午': ['午'], '酉': ['酉'], '亥': ['亥']
+            }
         };
 
         const App = () => {
@@ -273,16 +297,59 @@
                 const pairKey = sortedBranches.join('-');
                 
                 let content = "";
-                if (type === 'chong') content = RELATION_DICTS.chong[pairKey] || "相冲：主冲动、不安、冲突。";
-                else if (type === 'hai') content = RELATION_DICTS.hai[pairKey] || RELATION_DICTS.hai['子-未'];
-                else if (type === 'he') content = RELATION_DICTS.he['六合'];
+                let title = "";
+                
+                if (type === 'chong') {
+                    content = RELATION_DICTS.chong[pairKey] || "相冲：主冲动、不安、冲突。";
+                    title = "六冲";
+                } else if (type === 'hai') {
+                    content = RELATION_DICTS.hai[pairKey] || RELATION_DICTS.hai['子-未'];
+                    title = "六害";
+                } else if (type === 'he') {
+                    content = RELATION_DICTS.he['六合'];
+                    title = "六合";
+                } else if (type === 'sanhe') {
+                    // 确定三合类型
+                    const sanheTypes = {
+                        '亥卯未': ['亥', '卯', '未'],
+                        '寅午戌': ['寅', '午', '戌'],
+                        '巳酉丑': ['巳', '酉', '丑'],
+                        '申子辰': ['申', '子', '辰']
+                    };
+                    
+                    let sanheKey = '';
+                    for (const key in sanheTypes) {
+                        if (sanheTypes[key].includes(baziBranch) && sanheTypes[key].includes(targetBranch)) {
+                            sanheKey = key;
+                            break;
+                        }
+                    }
+                    
+                    content = RELATION_DICTS.sanhe[sanheKey] || "三合关系：主和谐、顺利。";
+                    title = "三合";
+                } else if (type === 'sanxing') {
+                    // 确定三刑类型
+                    let sanxingKey = '';
+                    if (['寅', '巳', '申'].includes(baziBranch) && ['寅', '巳', '申'].includes(targetBranch)) {
+                        sanxingKey = '寅巳申';
+                    } else if (['丑', '未', '戌'].includes(baziBranch) && ['丑', '未', '戌'].includes(targetBranch)) {
+                        sanxingKey = '丑未戌';
+                    } else if ((baziBranch === '子' && targetBranch === '卯') || (baziBranch === '卯' && targetBranch === '子')) {
+                        sanxingKey = '子卯';
+                    } else if (baziBranch === targetBranch && ['辰', '午', '酉', '亥'].includes(baziBranch)) {
+                        sanxingKey = '自刑';
+                    }
+                    
+                    content = RELATION_DICTS.sanxing[sanxingKey] || "三刑关系：主刑伤、纠纷。";
+                    title = "三刑";
+                }
 
                 setPopover({
                     open: true,
-                    title: `【${type === 'he' ? '六合' : type === 'chong' ? '六冲' : '六害'}】校对断语`,
+                    title: `【${title}】校对断语`,
                     subtitle: `${baziPos}支(${baziBranch}) 与 落宫(${targetBranch}) 相互作用`,
                     content: <div className="p-5 bg-red-50/50 rounded-2xl border border-red-100 text-sm leading-relaxed text-red-900 font-medium whitespace-pre-line">{content}</div>,
-                    type: type === 'he' ? 'good' : 'bad'
+                    type: type === 'he' || type === 'sanhe' ? 'good' : 'bad'
                 });
             };
 
@@ -437,9 +504,60 @@
                     let relationship = '无';
                     let type = 'neutral';
                     let relKey = '';
+                    
+                    // 检查六合
                     if (RELATIONSHIPS.he[selectedYongShen] === b.val) { relationship = '六合'; type = 'good'; relKey = 'he'; }
+                    // 检查相冲
                     else if (RELATIONSHIPS.chong[selectedYongShen] === b.val) { relationship = '相冲'; type = 'bad'; relKey = 'chong'; }
+                    // 检查相害
                     else if (RELATIONSHIPS.hai[selectedYongShen] === b.val) { relationship = '相害'; type = 'bad'; relKey = 'hai'; }
+                    // 检查三合
+                    else if (RELATIONSHIPS.sanhe[selectedYongShen] && RELATIONSHIPS.sanhe[selectedYongShen].includes(b.val)) {
+                        // 收集所有相关地支
+                        const allBranches = [selectedYongShen, b.val];
+                        // 检查是否有第三个地支在八字中
+                        const thirdBranch = RELATIONSHIPS.sanhe[selectedYongShen].find(branch => branch !== b.val);
+                        if (baziBranches.some(item => item.val === thirdBranch)) {
+                            relationship = '三合';
+                            type = 'good';
+                            relKey = 'sanhe';
+                        }
+                    }
+                    // 检查三刑
+                    else if (RELATIONSHIPS.sanxing[selectedYongShen]) {
+                        // 检查是否形成三刑
+                        if (RELATIONSHIPS.sanxing[selectedYongShen].includes(b.val)) {
+                            // 对于寅巳申、丑未戌三刑，需要检查第三个地支
+                            if ((selectedYongShen === '寅' || selectedYongShen === '巳' || selectedYongShen === '申') && 
+                                (b.val === '寅' || b.val === '巳' || b.val === '申')) {
+                                const thirdBranch = ['寅', '巳', '申'].find(branch => branch !== selectedYongShen && branch !== b.val);
+                                if (baziBranches.some(item => item.val === thirdBranch)) {
+                                    relationship = '三刑';
+                                    type = 'bad';
+                                    relKey = 'sanxing';
+                                }
+                            } else if ((selectedYongShen === '丑' || selectedYongShen === '未' || selectedYongShen === '戌') && 
+                                       (b.val === '丑' || b.val === '未' || b.val === '戌')) {
+                                const thirdBranch = ['丑', '未', '戌'].find(branch => branch !== selectedYongShen && branch !== b.val);
+                                if (baziBranches.some(item => item.val === thirdBranch)) {
+                                    relationship = '三刑';
+                                    type = 'bad';
+                                    relKey = 'sanxing';
+                                }
+                            } else if ((selectedYongShen === '子' && b.val === '卯') || (selectedYongShen === '卯' && b.val === '子')) {
+                                // 子卯刑
+                                relationship = '三刑';
+                                type = 'bad';
+                                relKey = 'sanxing';
+                            } else if (selectedYongShen === b.val && ['辰', '午', '酉', '亥'].includes(selectedYongShen)) {
+                                // 自刑
+                                relationship = '自刑';
+                                type = 'bad';
+                                relKey = 'sanxing';
+                            }
+                        }
+                    }
+                    
                     return { pos: b.key, branch: b.val, relationship, type, relKey };
                 });
 
@@ -474,8 +592,8 @@
                 <div className="min-h-screen p-4 md:p-8">
                     <div className="max-w-5xl mx-auto space-y-6">
                         <header className="mb-8">
-                            <h1 className="text-3xl font-serif font-bold text-red-900">鬼谷神掌 · 离线排盘</h1>
-                            <p className="text-[10px] text-neutral-400 tracking-widest uppercase">Palace Prediction Export Version</p>
+                            <h1 className="text-3xl font-serif font-bold text-red-900 tracking-[0.5em]">鬼谷神掌</h1>
+                            <p className="text-[10px] text-neutral-400 tracking-widest uppercase">Palace Prediction System</p>
                         </header>
 
                         {/* 输入面板 */}
@@ -519,6 +637,12 @@
                                             <div className="text-[10px] text-neutral-300 font-bold uppercase text-center">{['年','月','日','时'][idx]}</div>
                                         </div>
                                     ))}
+                                </div>
+                                
+                                {/* 功能按钮 */}
+                                <div className="flex gap-3 mt-6">
+                                    <button onClick={() => setBazi({ yearStem: '', yearBranch: '', monthStem: '', monthBranch: '', dayStem: '', dayBranch: '', hourStem: '', hourBranch: '' })} className="flex-1 py-3 bg-red-800 text-white rounded-xl font-bold hover:bg-red-700 transition-colors">清空</button>
+                                    <button onClick={generateRandomBazi} className="flex-1 py-3 bg-blue-500 text-white rounded-xl font-bold hover:bg-blue-600 transition-colors">随机</button>
                                 </div>
                             </div>
                         </div>
