@@ -601,9 +601,64 @@
                 // 计算空亡
                 const kongWang = calculateKongWang(bazi.dayStem, bazi.dayBranch);
                 const isKongWang = kongWang.includes(selectedYongShen);
+                
+                // 计算命宫与用神落宫的关系
+                const mingGongRelation = {
+                    position: '命宫',
+                    branch: mingGongBranch,
+                    relationship: '无',
+                    type: 'neutral',
+                    relKey: ''
+                };
+                
+                // 命宫地支关系判定
+                if (RELATIONSHIPS.he[selectedYongShen] === mingGongBranch) {
+                    mingGongRelation.relationship = '六合';
+                    mingGongRelation.type = 'good';
+                    mingGongRelation.relKey = 'he';
+                } else if (RELATIONSHIPS.chong[selectedYongShen] === mingGongBranch) {
+                    mingGongRelation.relationship = '相冲';
+                    mingGongRelation.type = 'bad';
+                    mingGongRelation.relKey = 'chong';
+                } else if (RELATIONSHIPS.hai[selectedYongShen] === mingGongBranch) {
+                    mingGongRelation.relationship = '相害';
+                    mingGongRelation.type = 'bad';
+                    mingGongRelation.relKey = 'hai';
+                } else if (RELATIONSHIPS.jue[selectedYongShen] === mingGongBranch) {
+                    mingGongRelation.relationship = '相绝';
+                    mingGongRelation.type = 'bad';
+                    mingGongRelation.relKey = 'jue';
+                } else if (RELATIONSHIPS.sanhe[selectedYongShen] && RELATIONSHIPS.sanhe[selectedYongShen].includes(mingGongBranch)) {
+                    // 半合判定
+                    mingGongRelation.relationship = '半合';
+                    mingGongRelation.type = 'good';
+                    mingGongRelation.relKey = 'sanhe';
+                }
+                
+                // 计算命宫与生克关系（将"我"改为"用"）
+                const mingGongShengKe = {
+                    position: '命宫',
+                    branch: mingGongBranch,
+                    relation: '无'
+                };
+                
+                const myElement = BRANCH_ELEMENTS[selectedYongShen];
+                const mingGongElement = BRANCH_ELEMENTS[mingGongBranch];
+                
+                if (myElement === mingGongElement) {
+                    mingGongShengKe.relation = '比合';
+                } else if (FIVE_ELEMENTS_RELATION['生'][mingGongElement] === myElement) {
+                    mingGongShengKe.relation = '生用';
+                } else if (FIVE_ELEMENTS_RELATION['生'][myElement] === mingGongElement) {
+                    mingGongShengKe.relation = '用生';
+                } else if (FIVE_ELEMENTS_RELATION['克'][mingGongElement] === myElement) {
+                    mingGongShengKe.relation = '克用';
+                } else if (FIVE_ELEMENTS_RELATION['克'][myElement] === mingGongElement) {
+                    mingGongShengKe.relation = '用克';
+                }
 
-                return { target, matrix, generateRelation, kongWang, isKongWang };
-            }, [selectedYongShen, tableData, bazi]);
+                return { target, matrix, generateRelation, kongWang, isKongWang, mingGongRelation, mingGongShengKe };
+            }, [selectedYongShen, tableData, bazi, mingGongBranch]);
 
             return (
                 <div className="min-h-screen p-4 md:p-8">
@@ -729,6 +784,9 @@
                                         <table className="w-full text-center text-xs sm:text-sm table-fixed">
                                             <thead>
                                                 <tr className="bg-neutral-100/50">
+                                                    {/* 命宫列 */}
+                                                    <th className="p-2 sm:p-3 border-r h-8 sm:h-10 whitespace-nowrap">命宫({analysis.mingGongRelation.branch})</th>
+                                                    {/* 其他列 */}
                                                     {analysis.matrix.map((row, i) => (
                                                         <th key={i} className="p-2 sm:p-3 border-r h-8 sm:h-10 whitespace-nowrap">{row.pos}支({row.branch})</th>
                                                     ))}
@@ -736,6 +794,11 @@
                                             </thead>
                                             <tbody>
                                                 <tr>
+                                                    {/* 命宫地支关系 */}
+                                                    <td className="p-2 sm:p-3 border-r h-8 sm:h-10 whitespace-nowrap">
+                                                        <button onClick={() => analysis.mingGongRelation.type !== 'neutral' && showRelationDuanYu(analysis.mingGongRelation.relKey, '命宫', analysis.mingGongRelation.branch, selectedYongShen)} className={`px-2 py-1 rounded font-bold text-xs sm:text-sm bg-neutral-200 text-neutral-700 cursor-default`}>{analysis.mingGongRelation.relationship}</button>
+                                                    </td>
+                                                    {/* 其他列地支关系 */}
                                                     {analysis.matrix.map((row, i) => (
                                                         <td key={i} className="p-2 sm:p-3 border-r h-8 sm:h-10 whitespace-nowrap">
                                                             <button onClick={() => row.type !== 'neutral' && showRelationDuanYu(row.relKey, row.pos, row.branch, selectedYongShen)} className={`px-2 py-1 rounded font-bold text-xs sm:text-sm ${row.type === 'good' ? 'bg-green-100 text-green-700' : row.type === 'bad' ? 'bg-red-100 text-red-700' : 'bg-neutral-200 text-neutral-400 cursor-default'}`}>{row.relationship}</button>
@@ -743,6 +806,11 @@
                                                     ))}
                                                 </tr>
                                                 <tr>
+                                                    {/* 命宫生克关系 */}
+                                                    <td className="p-2 sm:p-3 border-r h-8 sm:h-10 whitespace-nowrap">
+                                                        <div className={`px-2 py-1 rounded font-bold text-xs sm:text-sm bg-neutral-200 text-neutral-700`}>{analysis.mingGongShengKe.relation}</div>
+                                                    </td>
+                                                    {/* 其他列生克关系 */}
                                                     {analysis.generateRelation.map((relation, i) => (
                                                         <td key={i} className="p-2 sm:p-3 border-r h-8 sm:h-10 whitespace-nowrap">
                                                             <div className={`px-2 py-1 rounded font-bold text-xs sm:text-sm ${(relation === '生我' || relation === '比合') ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{relation}</div>
